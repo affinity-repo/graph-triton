@@ -10,12 +10,18 @@ from triton_kernels import mm as mm
 def welder(gm: torch.fx.GraphModule, example_inputs: List[torch.Tensor], **kwargs):
     # do import here to avoid loading inductor into memory when it is not used
     from torch._inductor.compile_fx import compile_fx
-    print("Using welder backend")
-    return compile_fx(gm, example_inputs, **kwargs)
+    new_fx = compile_fx(gm, example_inputs, **kwargs)
+    # do welder optimize here 
+    return new_fx
 
-#def fn(x, y):
-#    return torch.add(x, y)
+# Supported patterns more than torch.inductor
+# [ ] Gemm + Pointwise + Gemm
+# [ ] Conv + Pointwise
+# [ ] Gemm + Pointwise
+# [ ] Pointwise + Gemm/Conv
 
-#new_fn = torch.compile(fn, backend='welder')
-#input_tensor = torch.randn(2, 3).cuda()
-#print(new_fn(input_tensor, input_tensor))
+# Workflow
+# 1. Setup model + input tensor
+# 2. Generate Schedule + Read Welder Schedule
+# 3. Generate Python/Triton Code
+# 4. Compile, Run and Get Pefromance
