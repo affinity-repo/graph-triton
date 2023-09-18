@@ -1,4 +1,7 @@
 expecttest
 hypothesis
+pytest
 torch
 triton
+absl-py
+transformers

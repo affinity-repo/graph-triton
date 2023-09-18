@@ -20,7 +20,7 @@ from torch._inductor.compile_fx import (
     _shape_env_from_inputs,
     complex_memory_overlap,
     cudagraphify,
-    align_inputs
+    align_inputs,
 )
 from torch._inductor import config, overrides, pattern_matcher
 import torch._dynamo.config as dynamo_config
@@ -36,6 +36,7 @@ from torch._inductor.graph import GraphLowering
 from torch._inductor.debug import DebugContext
 
 from .graph import WelderGraphLowering
+
 
 @DebugContext.wrap
 @torch.utils._python_dispatch._disable_current_modes()
@@ -86,7 +87,7 @@ def welder_compile_fx_inner(
         with V.set_graph_handler(graph):
             graph.run(*example_inputs)
             compiled_fn = graph.compile_to_fn()
-        
+
     if cudagraphs:
         complex_memory_overlap_inputs = any(
             complex_memory_overlap(t) for t in example_inputs
@@ -204,16 +205,3 @@ def welder_compile_fx(
 def welder(gm: torch.fx.GraphModule, example_inputs: List[torch.Tensor], **kwargs):
     new_fx = welder_compile_fx(gm, example_inputs, **kwargs)
     return new_fx
-
-
-# Supported patterns more than torch.inductor
-# [ ] Gemm + Pointwise + Gemm
-# [ ] Conv + Pointwise
-# [ ] Gemm + Pointwise
-# [ ] Pointwise + Gemm/Conv
-
-# Workflow
-# 1. Setup model + input tensor
-# 2. Generate Schedule + Read Welder Schedule
-# 3. Generate Python/Triton Code
-# 4. Compile, Run and Get Pefromance
