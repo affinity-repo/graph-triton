@@ -86,7 +86,7 @@ def welder_compile_fx_inner(
         with V.set_graph_handler(graph):
             graph.run(*example_inputs)
             compiled_fn = graph.compile_to_fn()
-
+        
     if cudagraphs:
         complex_memory_overlap_inputs = any(
             complex_memory_overlap(t) for t in example_inputs
