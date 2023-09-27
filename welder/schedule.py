@@ -153,15 +153,13 @@ class WelderScheduler(Scheduler):
                 node.origins is not None
             ), "All nodes passed to scheduling must have an origin"
 
-            self.replace_externalkernels(node)
-
             if node.is_no_op():
                 self.nodes.append(NopKernelSchedulerNode(self, node))
             elif isinstance(node, (ir.ComputedBuffer, ir.TemplateBuffer)):
                 group_fn = self.get_backend(node.get_device()).group_fn
                 self.nodes.append(WelderSchedulerNode(self, node, group_fn))
             elif isinstance(node, ir.ExternKernel):
-                logger.error("External Unsupported Kernel Found!")
+                logger.error("Found External unsupported kernel!")
                 # self.nodes.append(ExternKernelSchedulerNode(self, node))
                 raise NotImplementedError(node)
             else:
@@ -201,11 +199,6 @@ class WelderScheduler(Scheduler):
         self.current_device = None
         self.buffer_names_to_free = set()
         self.buffer_names_no_longer_needed = set()
-
-    @dynamo_timed
-    def replace_externalkernels(self, node):
-        if isinstance(node, ir.ExternKernel) and node.kernel == "extern_kernels.addmm":
-            exit(0)
 
     @override
     def fuse_nodes(self):
@@ -275,16 +268,6 @@ class WelderScheduler(Scheduler):
                     self.current_device = device
 
             self.buffer_names_to_free.update(node.last_usage)
-
-            def print_log_info(node):
-                info = dict()
-                info["name"] = node.get_name()
-                info["is_reduction"] = node.is_reduction()
-                info["is_template"] = node.is_template()
-                # info["debug_str"] = node.debug_str()
-                print(node.debug_str())
-
-            # print_log_info(node)
 
             if node.is_template():
                 node, *epilogue = node.get_nodes()

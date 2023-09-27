@@ -11,7 +11,6 @@ from torch._inductor.utils import (
 )
 from .mm_common import (
     addmm_epilogue,
-    int8_mm_configs,
     mm_args,
     mm_configs,
     mm_grid,
@@ -19,19 +18,27 @@ from .mm_common import (
 )
 from loguru import logger
 
+from torch._inductor.lowering import lowerings
+
+
+black_list = ["tuned_mm", "tuned_bmm"]
+to_erase = []
+for k in lowerings.keys():
+    if lowerings[k].__name__ in black_list:
+        to_erase.append(k)
+for e in to_erase:
+    del lowerings[e]
+
 aten = torch.ops.aten
 
 mm_template = TritonTemplate(
-    name="welder::mm",
+    name="welder_mm",
     grid=mm_grid,
     source=r"""
 {{def_kernel("A", "B")}}
     M = {{size("A", 0)}}
     N = {{size("B", 1)}}
     K = {{size("A", 1)}}
-    if M * N == 0:
-        # early exit due to zero-size input(s)
-        return
     stride_am = {{stride("A", 0)}}
     stride_ak = {{stride("A", 1)}}
     stride_bk = {{stride("B", 0)}}
@@ -65,8 +72,6 @@ mm_template = TritonTemplate(
         else:
             a = tl.load(A, mask=rk[None, :] < k, other=0.)
             b = tl.load(B, mask=rk[:, None] < k, other=0.)
-        if B_PROLOGUE_CAST_TYPE is not None:
-            b = b.to(B_PROLOGUE_CAST_TYPE)
         acc += tl.dot(a, b, allow_tf32=ALLOW_TF32)
         A += BLOCK_K * stride_ak
         B += BLOCK_K * stride_bk
@@ -106,41 +111,17 @@ def tuned_mm(mat1, mat2, *, layout=None):
     # options to tune from
     choices = []
 
-    if m * n != 0 and use_triton_template(layout):
-        for config in mm_configs(m, n, k):
-            mm_template.maybe_append_choice(
-                choices,
-                input_nodes=(mat1, mat2),
-                layout=layout,
+    for config in mm_configs():
+        choices.append(
+            mm_template.generate(
+                (mat1, mat2),
+                layout,
                 **mm_options(config, k, layout),
             )
+        )
 
-    if m * n != 0 and use_cutlass_template(layout):
+    if len(choices) == 0:
+        logger.error("No valid config for aten.mm")
         raise NotImplementedError("Cutlass template not supported for mm.")
 
-    return autotune_select_algorithm("mm", choices, [mat1, mat2], layout)
-
-
-@register_lowering(aten.addmm)
-def tuned_addmm(inp, mat1, mat2, *, alpha=1, beta=1, layout=None):
-    logger.warning("Try triton tuned kernel for aten.addmm...")
-    ordered_kwargs_for_cpp_kernel = ("beta", "alpha")
-
-    m, n, k, layout, mat1, mat2, inp_expanded = mm_args(mat1, mat2, inp, layout=layout)
-
-    if use_triton_template(layout):
-        for config in mm_configs(m, n, k):
-            mm_template.maybe_append_choice(
-                choices,
-                input_nodes=(inp_expanded, mat1, mat2),
-                layout=layout,
-                **mm_options(config, k, layout),
-                prefix_args=1,
-                epilogue_fn=addmm_epilogue(layout.dtype, alpha, beta),
-            )
-    else:
-        raise NotImplementedError("Cutlass template not supported for addmm.")
-
-    return autotune_select_algorithm(
-        "addmm", choices, [inp_expanded, mat1, mat2], layout
-    )
+    return autotune_select_algorithm(choices, [mat1, mat2], layout)
