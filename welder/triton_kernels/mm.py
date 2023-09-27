@@ -1,7 +1,4 @@
-import logging
-
 import torch
-
 from torch._inductor import config as inductor_config
 from torch._inductor.lowering import register_lowering
 from torch._inductor.select_algorithm import (
@@ -20,8 +17,8 @@ from .mm_common import (
     mm_grid,
     mm_options,
 )
+from loguru import logger
 
-log = logging.getLogger(__name__)
 aten = torch.ops.aten
 
 mm_template = TritonTemplate(
@@ -86,6 +83,7 @@ mm_template = TritonTemplate(
 """,
 )
 
+
 def _is_int8_mat(mat):
     return mat.get_dtype() in (torch.int8, torch.uint8)
 
@@ -125,6 +123,7 @@ def tuned_mm(mat1, mat2, *, layout=None):
 
 @register_lowering(aten.addmm)
 def tuned_addmm(inp, mat1, mat2, *, alpha=1, beta=1, layout=None):
+    logger.warning("Try triton tuned kernel for aten.addmm...")
     ordered_kwargs_for_cpp_kernel = ("beta", "alpha")
 
     m, n, k, layout, mat1, mat2, inp_expanded = mm_args(mat1, mat2, inp, layout=layout)

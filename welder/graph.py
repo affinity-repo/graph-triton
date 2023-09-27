@@ -24,7 +24,14 @@ from torch._inductor.exc import (
     MissingOperatorWithDecomp,
     MissingOperatorWithoutDecomp,
 )
-from torch._inductor.ir import Constant, FixedLayout, InputBuffer, Pointwise, Reduction, TensorBox
+from torch._inductor.ir import (
+    Constant,
+    FixedLayout,
+    InputBuffer,
+    Pointwise,
+    Reduction,
+    TensorBox,
+)
 from torch._inductor.lowering import (
     FALLBACK_ALLOW_LIST,
     layout_constraints,
@@ -41,10 +48,12 @@ from torch._inductor.utils import (
 )
 from torch._inductor.virtualized import V
 from torch._inductor.graph import GraphLowering
+from .schedule import WelderScheduler
 
 log = logging.getLogger(__name__)
 
 output_triton_code_file = "triton_code.py"
+
 
 class WelderGraphLowering(GraphLowering):
     def __init__(
@@ -56,6 +65,15 @@ class WelderGraphLowering(GraphLowering):
     ):
         super().__init__(gm, shape_env, num_static_inputs, graph_id)
 
+    def codegen(self):
+        self.init_wrapper_code()
+
+        self.scheduler = WelderScheduler(self.buffers)
+        assert self.scheduler is not None  # mypy can't figure this out
+        self.scheduler.codegen()
+        assert self.wrapper_code is not None
+        return self.wrapper_code.generate()
+
     @dynamo_timed
     def compile_to_module(self):
         from torch._inductor.codecache import PyCodeCache
@@ -64,7 +82,7 @@ class WelderGraphLowering(GraphLowering):
         mod = PyCodeCache.load(code)
         for name, value in self.constants.items():
             setattr(mod, name, value)
-        
+
         # save code
         codefile = open(output_triton_code_file, "w")
         codefile.write(code)
@@ -74,5 +92,5 @@ class WelderGraphLowering(GraphLowering):
 
     def compile_to_fn(self):
         return self.compile_to_module().call
-        
-    #V.debug.output_code(mod.__file__)
+
+    # V.debug.output_code(mod.__file__)
