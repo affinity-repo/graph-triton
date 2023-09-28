@@ -161,7 +161,7 @@ class WelderScheduler(Scheduler):
             elif isinstance(node, ir.ExternKernel):
                 logger.error("Found External unsupported kernel!")
                 self.nodes.append(ExternKernelSchedulerNode(self, node))
-                # raise NotImplementedError(node)
+                raise NotImplementedError(node)
             else:
                 raise NotImplementedError(node)
         # some new constants could have been created above
