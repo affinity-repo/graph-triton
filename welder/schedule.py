@@ -139,67 +139,6 @@ class WelderSchedulerNode(BaseSchedulerNode):
 
 
 class WelderScheduler(Scheduler):
-    @dynamo_timed
-    def __init__(self, nodes):
-        self.backends = {}
-
-        self.nodes = []
-        self.available_buffer_names = {
-            *V.graph.graph_inputs.keys(),
-            *V.graph.constants.keys(),
-        }
-        for node in nodes:
-            assert (
-                node.origins is not None
-            ), "All nodes passed to scheduling must have an origin"
-
-            if node.is_no_op():
-                self.nodes.append(NopKernelSchedulerNode(self, node))
-            elif isinstance(node, (ir.ComputedBuffer, ir.TemplateBuffer)):
-                group_fn = self.get_backend(node.get_device()).group_fn
-                self.nodes.append(WelderSchedulerNode(self, node, group_fn))
-            elif isinstance(node, ir.ExternKernel):
-                logger.error("Found External unsupported kernel!")
-                self.nodes.append(ExternKernelSchedulerNode(self, node))
-                raise NotImplementedError(node)
-            else:
-                raise NotImplementedError(node)
-        # some new constants could have been created above
-        self.available_buffer_names.update(V.graph.constants.keys())
-        for node in self.nodes:
-            node.prune_deps()
-
-        self.name_to_node = {node.get_name(): node for node in self.nodes}
-        self.name_to_fused_node = None  # set in fuse_nods()
-
-        # we handle mutation by renaming modified versions of the same
-        # buffer in the dependency graph to prevent cycles.
-        # mutation_renames: tracks the current name for a given buffer
-        #                   (changed once per mutation)
-        self.mutation_real_name = {}
-        # mutation_real_name: maps back to the original name for codegen
-        self.mutation_renames = {}
-
-        self.compute_dependencies()
-        self.topological_sort_schedule()
-        self.compute_predecessors()
-        self.dead_node_elimination()
-
-        metrics.ir_nodes_pre_fusion += len(self.nodes)
-        V.debug.ir_pre_fusion(self.nodes)
-        self.num_orig_nodes = len(self.nodes)
-        self.name_to_fused_node = {n.get_name(): n for n in self.nodes}
-        self.fuse_nodes()
-        self.compute_last_usage()
-        V.debug.ir_post_fusion(self.nodes)
-        V.debug.graph_diagram(self.nodes)
-        self.debug_draw_graph()
-
-        # used during codegen:
-        self.current_device = None
-        self.buffer_names_to_free = set()
-        self.buffer_names_no_longer_needed = set()
-
     # @override
     def fuse_nodes(self):
         """
