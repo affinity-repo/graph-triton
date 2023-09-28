@@ -21,7 +21,7 @@ from loguru import logger
 from torch._inductor.lowering import lowerings
 
 
-black_list = ["tuned_mm", "tuned_bmm"]
+black_list = ["tuned_mm", "tuned_bmm", "tuned_addbmm"]
 to_erase = []
 for k in lowerings.keys():
     if lowerings[k].__name__ in black_list:
@@ -125,3 +125,22 @@ def tuned_mm(mat1, mat2, *, layout=None):
         raise NotImplementedError("Cutlass template not supported for mm.")
 
     return autotune_select_algorithm(choices, [mat1, mat2], layout)
+
+
+@register_lowering(aten.addmm)
+def tuned_addmm(inp, mat1, mat2, *, alpha=1, beta=1, layout=None):
+    m, n, k, layout, mat1, mat2, inp_expanded = mm_args(mat1, mat2, inp, layout=layout)
+
+    choices = []
+    for config in mm_configs():
+        choices.append(
+            mm_template.generate(
+                (inp_expanded, mat1, mat2),
+                layout,
+                **mm_options(config, k, layout),
+                prefix_args=1,
+                epilogue_fn=addmm_epilogue(layout.dtype, alpha, beta),
+            )
+        )
+
+    return autotune_select_algorithm(choices, [inp_expanded, mat1, mat2], layout)

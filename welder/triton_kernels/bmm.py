@@ -10,6 +10,8 @@ from torch._inductor.utils import ceildiv as cdiv, use_triton_template
 
 from .mm_common import addmm_epilogue, mm_args, mm_configs, mm_options
 
+from loguru import logger
+
 aten = torch.ops.aten
 
 
@@ -18,7 +20,7 @@ def bmm_grid(b, m, n, meta):
 
 
 bmm_template = TritonTemplate(
-    name="welder::bmm",
+    name="welder_bmm",
     grid=bmm_grid,
     source=r"""
 {{def_kernel("A", "B")}}
@@ -88,13 +90,17 @@ def tuned_bmm(mat1, mat2, *, layout=None):
 
     # options to tune from
     choices = []
-    if use_triton_template(layout):
-        for config in mm_configs(m, n, k):
-            bmm_template.maybe_append_choice(
-                choices,
-                input_nodes=(mat1, mat2),
-                layout=layout,
+    for config in mm_configs():
+        choices.append(
+            bmm_template.generate(
+                (mat1, mat2),
+                layout,
                 **mm_options(config, k, layout),
             )
+        )
 
-    return autotune_select_algorithm("bmm", choices, [mat1, mat2], layout)
+    if len(choices) == 0:
+        logger.error("No valid config for aten.mm")
+        raise NotImplementedError("Cutlass template not supported for mm.")
+
+    return autotune_select_algorithm(choices, [mat1, mat2], layout)

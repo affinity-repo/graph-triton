@@ -160,8 +160,8 @@ class WelderScheduler(Scheduler):
                 self.nodes.append(WelderSchedulerNode(self, node, group_fn))
             elif isinstance(node, ir.ExternKernel):
                 logger.error("Found External unsupported kernel!")
-                # self.nodes.append(ExternKernelSchedulerNode(self, node))
-                raise NotImplementedError(node)
+                self.nodes.append(ExternKernelSchedulerNode(self, node))
+                # raise NotImplementedError(node)
             else:
                 raise NotImplementedError(node)
         # some new constants could have been created above
@@ -200,7 +200,7 @@ class WelderScheduler(Scheduler):
         self.buffer_names_to_free = set()
         self.buffer_names_no_longer_needed = set()
 
-    @override
+    # @override
     def fuse_nodes(self):
         """
         Mutates self.nodes to combine nodes into FusedSchedulerNodes.
