@@ -199,9 +199,3 @@ def welder_compile_fx(
             ),
             keep_inference_input_mutations=True,
         )(model_, example_inputs_)
-
-
-@register_backend
-def welder(gm: torch.fx.GraphModule, example_inputs: List[torch.Tensor], **kwargs):
-    new_fx = welder_compile_fx(gm, example_inputs, **kwargs)
-    return new_fx
