@@ -1,7 +1,7 @@
 expecttest
 hypothesis
 pytest
-torch
+torch # '2.1.0+cu121'
 triton
 absl-py
 transformers
