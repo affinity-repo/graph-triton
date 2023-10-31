@@ -1,4 +1,4 @@
-import math
+import math, time
 from typing import List, Optional, Union
 
 import torch
@@ -6,6 +6,24 @@ import triton
 import triton.language as tl
 from torch.autograd.function import FunctionCtx
 from torch.cuda.amp import custom_fwd
+
+
+def gpu_time_profiler(func):
+    def wrapper(*args, **kwargs):
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+
+        start_event.record()
+        result = func(*args, **kwargs)
+        end_event.record()
+
+        torch.cuda.synchronize()  # 等待GPU上所有操作完成
+        elapsed_time = start_event.elapsed_time(end_event)  # 时间单位是毫秒
+        print(f"{func.__name__}执行时间：{elapsed_time:.3f} ms")
+
+        return result
+
+    return wrapper
 
 
 def attention_reference(
@@ -31,6 +49,7 @@ def attention_reference(
     return ref_out
 
 
+@gpu_time_profiler
 def retention_reference(
     q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, m: torch.Tensor
 ):
@@ -124,9 +143,6 @@ def _fwd_kernel(
     v_ptrs = v_ptr + v_offs
     output_ptrs = output_ptr + output_offs
 
-    l_i = tl.zeros((BLOCK_M_SIZE,), dtype=tl.float32) - float("inf")
-    d_i = tl.zeros((BLOCK_M_SIZE,), dtype=tl.float32)
-
     q = tl.load(q_ptrs)
     block_n_end = n_size
 
@@ -215,7 +231,8 @@ class TileAttention(torch.autograd.Function):
         return output
 
 
-def attention_forward(
+@gpu_time_profiler
+def retention_forward(
     q: torch.Tensor,
     k: torch.Tensor,
     v: torch.Tensor,
@@ -227,8 +244,8 @@ def attention_forward(
 
 b = 1
 h = 32
-s = 128
-d = 32
+s = 2048
+d = 64
 
 # b h s d
 q = torch.rand([b, h, s, d]).cuda().half()
@@ -238,6 +255,6 @@ o = torch.rand([b, h, s, d]).cuda().half()
 # b h s s
 m = torch.ones([b, h, s, s]).cuda().half()
 # fa
-attention_forward(q, k, v, o, m)
+retention_forward(q, k, v, o, m)
 o1 = retention_reference(q, k, v, m)
 assert torch.allclose(o, o1, rtol=1e-3, atol=1e-3)

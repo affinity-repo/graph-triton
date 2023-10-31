@@ -1,0 +1,14 @@
+# Tiled Triton FlashRetention
+b = 1 h = 32 s = 2048 d = 64
+retention_triton：10.471 ms
+retention_reference：31.091 ms
+
+# Tiled Triton FlashAttentioin
+b = 1 h = 32 s = 2048 d = 64
+attention_triton：9.977 ms
+attention_reference：28.187 ms
+
+# Tiled Triton FlashRetention, 2 times hidden dim for V
+b = 1 h = 32 s = 2048 d = 64 d = 128
+retention_forward：10.648 ms
+retention_reference：34.464 ms

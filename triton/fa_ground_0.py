@@ -1,4 +1,4 @@
-import math
+import math, time
 from typing import List, Optional, Union
 
 import torch
@@ -8,6 +8,25 @@ from torch.autograd.function import FunctionCtx
 from torch.cuda.amp import custom_fwd
 
 
+def gpu_time_profiler(func):
+    def wrapper(*args, **kwargs):
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+
+        start_event.record()
+        result = func(*args, **kwargs)
+        end_event.record()
+
+        torch.cuda.synchronize()  # 等待GPU上所有操作完成
+        elapsed_time = start_event.elapsed_time(end_event)  # 时间单位是毫秒
+        print(f"{func.__name__}执行时间：{elapsed_time:.3f} ms")
+
+        return result
+
+    return wrapper
+
+
+@gpu_time_profiler
 def attention_reference(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -253,6 +272,7 @@ class TileAttention(torch.autograd.Function):
         return output
 
 
+@gpu_time_profiler
 def attention_forward(
     q: torch.Tensor,
     k: torch.Tensor,
@@ -265,8 +285,8 @@ def attention_forward(
 
 b = 1
 h = 32
-s = 128
-d = 32
+s = 2048
+d = 64
 
 # b h s d
 q = torch.rand([b, h, s, d]).cuda().half()
