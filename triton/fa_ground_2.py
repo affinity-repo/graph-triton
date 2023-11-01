@@ -10,15 +10,17 @@ from torch.cuda.amp import custom_fwd
 
 def gpu_time_profiler(func):
     def wrapper(*args, **kwargs):
+        times = 100
         start_event = torch.cuda.Event(enable_timing=True)
         end_event = torch.cuda.Event(enable_timing=True)
 
         start_event.record()
-        result = func(*args, **kwargs)
+        for i in range(0, times):
+            result = func(*args, **kwargs)
         end_event.record()
 
         torch.cuda.synchronize()  # 等待GPU上所有操作完成
-        elapsed_time = start_event.elapsed_time(end_event)  # 时间单位是毫秒
+        elapsed_time = start_event.elapsed_time(end_event) / times  # 时间单位是毫秒
         print(f"{func.__name__}执行时间：{elapsed_time:.3f} ms")
 
         return result
@@ -227,8 +229,8 @@ class TileAttention(torch.autograd.Function):
             *attention_mask.size(),  # (batch, heads, m_size, size_k)
             dhead,  # BLOCK_DHEAD
             vhead,
-            128,  # BLOCK_M_SIZE
-            128,  # BLOCK_N_SIZE
+            64,  # BLOCK_M_SIZE
+            64,  # BLOCK_N_SIZE
             num_warps=4 if k.size(3) <= 64 else 8,
             num_stages=2,
         )
@@ -246,10 +248,10 @@ def retention_forward(
     return TileAttention.apply(q, k, v, output, attention_mask)
 
 
-b = 1
-h = 32
+b = 4
+h = 8
 s = 2048
-d = 64
+d = 128
 
 # b h s d
 q = torch.rand([b, h, s, d]).cuda().half()

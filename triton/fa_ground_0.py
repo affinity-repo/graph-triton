@@ -14,11 +14,12 @@ def gpu_time_profiler(func):
         end_event = torch.cuda.Event(enable_timing=True)
 
         start_event.record()
-        result = func(*args, **kwargs)
+        for i in range(0, 100):
+            result = func(*args, **kwargs)
         end_event.record()
 
         torch.cuda.synchronize()  # 等待GPU上所有操作完成
-        elapsed_time = start_event.elapsed_time(end_event)  # 时间单位是毫秒
+        elapsed_time = start_event.elapsed_time(end_event) / 100  # 时间单位是毫秒
         print(f"{func.__name__}执行时间：{elapsed_time:.3f} ms")
 
         return result
@@ -283,8 +284,8 @@ def attention_forward(
     return TileAttention.apply(q, k, v, output, attention_mask)
 
 
-b = 1
-h = 32
+b = 4
+h = 8
 s = 2048
 d = 64
 
