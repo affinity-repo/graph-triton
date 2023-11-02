@@ -139,16 +139,16 @@ class WelderSchedulerNode(BaseSchedulerNode):
 
 
 class WelderScheduler(Scheduler):
-    # @override
+    @override
     def fuse_nodes(self):
         """
         Mutates self.nodes to combine nodes into FusedSchedulerNodes.
         """
-        # for _ in range(10):
-        #   old_len = len(self.nodes)
-        #    self.fuse_nodes_once()
-        #    if len(self.nodes) == old_len:
-        #        break
+        for _ in range(1):
+            old_len = len(self.nodes)
+            self.fuse_nodes_once()
+            if len(self.nodes) == old_len:
+                break
         # TODO(wenxh): Replace this by using fuse_nodes_using_welder_result();
 
     def fuse_nodes_using_welder_result(self):
@@ -162,21 +162,29 @@ class WelderScheduler(Scheduler):
             - self.can_fuses(): checks if a fusion is legal
             - self.score_fusion(): assigns priority to a given fusion
         """
-        fused_nodes = set(self.nodes)
-        for node1, node2 in self.get_possible_fusions():
-            node1 = self.name_to_fused_node[node1.get_first_name()]
-            node2 = self.name_to_fused_node[node2.get_first_name()]
-            if self.can_fuse(node1, node2) and not self.will_fusion_create_cycle(
-                node1, node2
-            ):
-                node3 = FusedSchedulerNode.fuse(node1, node2)
-                fused_nodes.remove(node1)
-                fused_nodes.remove(node2)
-                fused_nodes.add(node3)
-                self.name_to_fused_node.update(
-                    {n.get_name(): node3 for n in node3.get_nodes()}
-                )
-        self.nodes = sorted(fused_nodes, key=lambda x: x.min_order)
+        # fused_nodes = (self.nodes)
+        # for node1, node2 in self.get_possible_fusions():
+        #    node1 = self.name_to_fused_node[node1.get_first_name()]
+        #    node2 = self.name_to_fused_node[node2.get_first_name()]
+        # if self.can_fuse(node1, node2) and not self.will_fusion_create_cycle(
+        #    node1, node2
+        # ):
+        #    if True:
+        #        node3 = FusedSchedulerNode.fuse(node1, node2)
+        #        fused_nodes.remove(node1)
+        #        fused_nodes.remove(node2)
+        #        fused_nodes.add(node3)
+        #        self.name_to_fused_node.update(
+        #            {n.get_name(): node3 for n in node3.get_nodes()}
+        #        )
+        logger.info("Init Operator #0")
+        fused_node = self.nodes[0]
+        if len(self.nodes) > 1:
+            for i in range(1, len(self.nodes)):
+                fused_node = FusedSchedulerNode.fuse(fused_node, self.nodes[i])
+                logger.info("Fusing Operator #" + str(i))
+
+        self.nodes = sorted([fused_node], key=lambda x: x.min_order)
         self.topological_sort_schedule()
         self.prune_redundant_deps()
 

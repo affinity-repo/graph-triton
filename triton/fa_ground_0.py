@@ -265,8 +265,8 @@ class TileAttention(torch.autograd.Function):
             torch.finfo(attention_mask.dtype).min,  # min_clamp_value
             *attention_mask.size(),  # (batch, heads, m_size, size_k)
             dhead,  # BLOCK_DHEAD
-            128,  # BLOCK_M_SIZE
-            128,  # BLOCK_N_SIZE
+            64,  # BLOCK_M_SIZE
+            64,  # BLOCK_N_SIZE
             num_warps=4 if k.size(3) <= 64 else 8,
             num_stages=2,
         )
@@ -287,7 +287,7 @@ def attention_forward(
 b = 4
 h = 8
 s = 2048
-d = 64
+d = 128
 
 # b h s d
 q = torch.rand([b, h, s, d]).cuda().half()

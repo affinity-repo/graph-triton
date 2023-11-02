@@ -1,0 +1,33 @@
+[
+    [
+        6,
+        ' - einstein_v2("mediate0[B, H, Q, K] +=! input0[B, H, Q, KD] * input1[B, H, K, KD]; output0[B, H, Q, K] = mediate0[B, H, Q, K] * input2[H, Q, K];", input_dict={ "input0" : { "dtype" : "float16", "shape" : [4, 8, 2048, 64]} ,  "input1" : { "dtype" : "float16", "shape" : [4, 8, 128, 64]} ,  "input2" : { "dtype" : "float16", "shape" : [8, 2048, 128]} }) ## @: tensorCoreConfig=(2, 3) ',
+        "MatMul0",
+        [[0, 0], [1, 0], [3, 0]],
+    ],
+    [
+        7,
+        ' - einstein_v2("output0[B, H, Q] +=! input0[B, H, Q, K].call(`abs`);", input_dict={ "input0" : { "dtype" : "float16", "shape" : [4, 8, 2048, 128]} })  ',
+        "Reduce",
+        [[6, 0]],
+    ],
+    [
+        14,
+        ' - einstein_v2(" output0[B, H, Q] = (input0[B, H, Q]).call(`max`, [const(1.0).cast(input0[0].dtype())]);", input_dict={ "input0" : { "dtype" : "float16", "shape" : [4, 8, 2048]} })  ',
+        "Elementwise",
+        [[7, 0]],
+    ],
+    [
+        8,
+        ' - einstein_v2(" mediate1[B, H, Q, D] = input4[B, H, Q, D] * input3[B, H, Q] / input2[B, H, Q]; mediate0[B, H, Q, K] =  input0[B, H, Q, K] / input2[B, H, Q]; mediate2[B, H, Q, D] +=! mediate0[B, H, Q, K] * input1[B, H, K, D]; output0[B, H, Q, D] = mediate1[B, H, Q, D] + mediate2[B, H, Q, D];", input_dict={ "input0" : { "dtype" : "float16", "shape" : [4, 8, 2048, 128]} ,  "input1" : { "dtype" : "float16", "shape" : [4, 8, 128, 128]} ,  "input2" : { "dtype" : "float16", "shape" : [4, 8, 2048]},  "input3" : { "dtype" : "float16", "shape" : [4, 8, 2048]},  "input4" : { "dtype" : "float16", "shape" : [4, 8, 2048, 128]} }) ## @: tensorCoreConfig=(2, 3) ',
+        "MatMul1",
+        [[6, 0], [2, 0], [14, 0], [7, 0], [4, 0]],
+    ],
+    [
+        9,
+        ' - einstein_v2("output0[N0, N1, N2, N3] = input0[N0, N1, N2, N3]", input_dict={ "input0" : { "dtype" : "float16", "shape" : [4, 8, 2048, 128]} })  ',
+        "Identity",
+        [[8, 0]],
+    ],
+    [5, "", "Result", [[9, 0]]],
+]
